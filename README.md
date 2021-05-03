@@ -1,6 +1,6 @@
 # Google Project
 
-## Eric Stoecklin, Kaylie Lewis, Jaleel Attah, Aubryn King, Chris Wills
+# Eric Stoecklin, Kaylie Lewis, Jaleel Attah, Aubryn King, Chris Wills
 
 
 # Data
