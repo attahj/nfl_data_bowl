@@ -1,0 +1,2975 @@
+---
+title: "Log Regressions with QB ID and Data Frame Creation"
+author: "Chris Wills"
+date: "4/22/2021"
+output: html_document
+---
+
+```{r}
+################## LEAGUE AVERAGE ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+library(scales)
+
+
+## Establishing connection between RStudio and BigQuery
+remotes::install_github("r-dbi/DBI")
+
+remotes::install_github("r-dbi/bigrquery") 
+
+con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+dbListTables(con)
+
+## SQL Query
+sqlStr3 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7`";
+
+ball_distance = dbGetQuery(con, sqlStr3);
+
+
+## Removing NAs from the data
+ball_distance1 = ball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+ball_distance1$passResult[ball_distance1$passResult == "IN"] <- "I"
+ball_distance1$passResult[ball_distance1$passResult == "C"] <- 1
+ball_distance1$passResult[ball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+ball_distance1$passResult <- factor(ball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(ball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(ball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit <- glm(passResult ~ NearestDefender, data = ball_distance1, family = "binomial")
+
+summary(mylogit)
+
+## Preparing the results for visualization
+newdat2 <- data.frame(NearestDefender=seq(min(ball_distance1$NearestDefender), 
+max(ball_distance1$NearestDefender)))
+
+newdat2$passResult = predict(mylogit, newdata=newdat2, type = "response")
+
+ball_distance2 = table(cut(ball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 23, by = 1)))
+ball_distance3 <- as.data.frame(ball_distance2)
+
+newdat2$total = ball_distance3$Freq
+
+## Plotting the logistic regression
+avgPlayer = plot_ly(newdat2, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "League Average", mode = "markers",
+              marker = list(size = ~total, sizeref = 60)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender(League Average)", legend = list(x = 100, y = 0.0)) 
+avgPlayer
+
+## creates rank list for difficult throw data table
+sqlStr = "select * from `wsu-nfl-team1.kaggle_raw.difficultThrowRank`"
+difThrow.df = dbGetQuery(con,sqlStr)
+difThrow.df = as.data.frame(difThrow.df)
+
+## creates completion GIF data table
+sql_str = "select concat(displayName,' - ',QBteam, ' v ' ,OPPteam, playId) as displayName, avgCompRate, gameId, playId from (select * from wsu-nfl-team1.kaggle_raw.difThrowTab order by avgCompRate)"
+gifComp.df = dbGetQuery(con,sql_str)
+gifComp.df = as.data.frame(gifComp.df)
+gifComp.df[,2] = round(gifComp.df[,2] * 100, digits = 2)
+#gifComp.df[,2] = as.character(gifComp.df[,2])
+
+## creates QB list for completion tab 
+sql_str1 = 'select * from wsu-nfl-team1.kaggle_raw.listQBs order by displayName'
+qbList.df = dbGetQuery(con,sql_str1)
+qbList.df = as.data.frame(qbList.df)
+
+```
+
+```{r}
+################## AARON RODGERS (GREEN BAY PACKERS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr2 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2506363";
+
+GBball_distance = dbGetQuery(con, sqlStr2);
+
+
+## Removing NAs from the data
+GBball_distance1 = GBball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+GBball_distance1$passResult[GBball_distance1$passResult == "IN"] <- "I"
+GBball_distance1$passResult[GBball_distance1$passResult == "C"] <- 1
+GBball_distance1$passResult[GBball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+GBball_distance1$passResult <- factor(GBball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(GBball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(GBball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit1 <- glm(passResult ~ NearestDefender, data = GBball_distance1, family = "binomial")
+
+summary(mylogit1)
+
+## Preparing the results for visualization
+newdat1 <- data.frame(NearestDefender=seq(min(GBball_distance1$NearestDefender), 
+max(GBball_distance1$NearestDefender)))
+
+newdat1$passResult = predict(mylogit1, newdata=newdat1, type = "response")
+
+GBball_distance2 = table(cut(GBball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 13, by = 1)))
+GBball_distance3 <- as.data.frame(GBball_distance2)
+
+newdat1$total = GBball_distance3$Freq
+
+
+## Plotting the logistic regression
+p7 = plot_ly(newdat1, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Aaron Rodgers", mode = "markers", line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender") 
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2506363 = add_trace(p7, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## KIRK COUSINS (MINNESOTA VIKINGS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr5 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2532820";
+
+MINball_distance = dbGetQuery(con, sqlStr5);
+
+
+## Removing NAs from the data
+MINball_distance1 = MINball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+MINball_distance1$passResult[MINball_distance1$passResult == "IN"] <- "I"
+MINball_distance1$passResult[MINball_distance1$passResult == "C"] <- 1
+MINball_distance1$passResult[MINball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+MINball_distance1$passResult <- factor(MINball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(MINball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(MINball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit2 <- glm(passResult ~ NearestDefender, data = MINball_distance1, family = "binomial")
+
+summary(mylogit2)
+
+## Preparing the results for visualization
+newdat3 <- data.frame(NearestDefender=seq(min(MINball_distance1$NearestDefender), 
+max(MINball_distance1$NearestDefender)))
+
+newdat3$passResult = predict(mylogit2, newdata=newdat3, type = "response")
+
+MINball_distance2 = table(cut(MINball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 20, by = 1)))
+MINball_distance3 <- as.data.frame(MINball_distance2)
+
+newdat3$total = MINball_distance3$Freq
+
+## Plotting the logistic regression
+p9 = plot_ly(newdat3, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Kirk Cousins", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender") 
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2532820 = add_trace(p9, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## MITCH TRUBISKY (CHICAGO BEARS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr6 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2558008";
+
+CHIball_distance = dbGetQuery(con, sqlStr6);
+
+
+## Removing NAs from the data
+CHIball_distance1 = CHIball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+CHIball_distance1$passResult[CHIball_distance1$passResult == "IN"] <- "I"
+CHIball_distance1$passResult[CHIball_distance1$passResult == "C"] <- 1
+CHIball_distance1$passResult[CHIball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+CHIball_distance1$passResult <- factor(CHIball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(CHIball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(CHIball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit3 <- glm(passResult ~ NearestDefender, data = CHIball_distance1, family = "binomial")
+
+summary(mylogit3)
+
+## Preparing the results for visualization
+newdat4 <- data.frame(NearestDefender=seq(min(CHIball_distance1$NearestDefender), 
+max(CHIball_distance1$NearestDefender)))
+
+newdat4$passResult = predict(mylogit3, newdata=newdat4, type = "response")
+
+CHIball_distance2 = table(cut(CHIball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 18, by = 1)))
+CHIball_distance3 <- as.data.frame(CHIball_distance2)
+
+newdat4$total = CHIball_distance3$Freq
+
+## Plotting the logistic regression
+p10 = plot_ly(newdat4, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Mitch Trubisky", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender") 
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2558008 = add_trace(p10, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## MATTHEW STAFFORD (DETROIT LIONS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr7 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 79860";
+
+DETball_distance = dbGetQuery(con, sqlStr7);
+
+
+## Removing NAs from the data
+DETball_distance1 = DETball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+DETball_distance1$passResult[DETball_distance1$passResult == "IN"] <- "I"
+DETball_distance1$passResult[DETball_distance1$passResult == "C"] <- 1
+DETball_distance1$passResult[DETball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+DETball_distance1$passResult <- factor(DETball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(DETball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(DETball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit4 <- glm(passResult ~ NearestDefender, data = DETball_distance1, family = "binomial")
+
+summary(mylogit4)
+
+## Preparing the results for visualization
+newdat5 <- data.frame(NearestDefender=seq(min(DETball_distance1$NearestDefender), 
+max(DETball_distance1$NearestDefender)))
+
+newdat5$passResult = predict(mylogit4, newdata=newdat5, type = "response")
+
+DETball_distance2 = table(cut(DETball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 17, by = 1)))
+DETball_distance3 <- as.data.frame(DETball_distance2)
+
+newdat5$total = DETball_distance3$Freq
+
+## Plotting the logistic regression
+p11 = plot_ly(newdat5, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Matthew Stafford", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender") 
+
+## Adding an extra line to the graph that represents the league average
+OpenRec79860 = add_trace(p11, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## RUSSELL WILSON (SEATTLE SEAHAWKS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr8 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2532975";
+
+SEAball_distance = dbGetQuery(con, sqlStr8);
+
+
+## Removing NAs from the data
+SEAball_distance1 = SEAball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+SEAball_distance1$passResult[SEAball_distance1$passResult == "IN"] <- "I"
+SEAball_distance1$passResult[SEAball_distance1$passResult == "C"] <- 1
+SEAball_distance1$passResult[SEAball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+SEAball_distance1$passResult <- factor(SEAball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(SEAball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(SEAball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit5 <- glm(passResult ~ NearestDefender, data = SEAball_distance1, family = "binomial")
+
+summary(mylogit5)
+
+## Preparing the results for visualization
+newdat6 <- data.frame(NearestDefender=seq(min(SEAball_distance1$NearestDefender), 
+max(SEAball_distance1$NearestDefender)))
+
+newdat6$passResult = predict(mylogit5, newdata=newdat6, type = "response")
+
+SEAball_distance2 = table(cut(SEAball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 15, by = 1)))
+SEAball_distance3 <- as.data.frame(SEAball_distance2)
+
+newdat6$total = SEAball_distance3$Freq
+
+## Plotting the logistic regression
+p12 = plot_ly(newdat6, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Russell Wilson", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2532975 = add_trace(p12, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## JARED GOFF (LOS ANGELES RAMS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr9 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2555334";
+
+LAball_distance = dbGetQuery(con, sqlStr9);
+
+
+## Removing NAs from the data
+LAball_distance1 = LAball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+LAball_distance1$passResult[LAball_distance1$passResult == "IN"] <- "I"
+LAball_distance1$passResult[LAball_distance1$passResult == "C"] <- 1
+LAball_distance1$passResult[LAball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+LAball_distance1$passResult <- factor(LAball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(LAball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(LAball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit6 <- glm(passResult ~ NearestDefender, data = LAball_distance1, family = "binomial")
+
+summary(mylogit6)
+
+## Preparing the results for visualization
+newdat7 <- data.frame(NearestDefender=seq(min(LAball_distance1$NearestDefender), 
+max(LAball_distance1$NearestDefender)))
+
+newdat7$passResult = predict(mylogit6, newdata=newdat7, type = "response")
+
+LAball_distance2 = table(cut(LAball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 15, by = 1)))
+LAball_distance3 <- as.data.frame(LAball_distance2)
+
+newdat7$total = LAball_distance3$Freq
+
+## Plotting the logistic regression
+p13 = plot_ly(newdat7, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Jared Goff", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2555334 = add_trace(p13, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## NICK MULLENS (SAN FRANCISCO 49ERS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr10 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2558979";
+
+SFball_distance = dbGetQuery(con, sqlStr10);
+
+
+## Removing NAs from the data
+SFball_distance1 = SFball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+SFball_distance1$passResult[SFball_distance1$passResult == "IN"] <- "I"
+SFball_distance1$passResult[SFball_distance1$passResult == "C"] <- 1
+SFball_distance1$passResult[SFball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+SFball_distance1$passResult <- factor(SFball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(SFball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(SFball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit7 <- glm(passResult ~ NearestDefender, data = SFball_distance1, family = "binomial")
+
+summary(mylogit7)
+
+## Preparing the results for visualization
+newdat8 <- data.frame(NearestDefender=seq(min(SFball_distance1$NearestDefender), 
+max(SFball_distance1$NearestDefender)))
+
+newdat8$passResult = predict(mylogit7, newdata=newdat8, type = "response")
+
+SFball_distance2 = table(cut(SFball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 14, by = 1)))
+SFball_distance3 <- as.data.frame(SFball_distance2)
+
+newdat8$total = SFball_distance3$Freq
+
+## Plotting the logistic regression
+p14 = plot_ly(newdat8, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Nick Mullens", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2558979 = add_trace(p14, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## JOSH ROSEN (ARIZONA CARDINALS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr11 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2560858";
+
+ARIball_distance = dbGetQuery(con, sqlStr11);
+
+
+## Removing NAs from the data
+ARIball_distance1 = ARIball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+ARIball_distance1$passResult[ARIball_distance1$passResult == "IN"] <- "I"
+ARIball_distance1$passResult[ARIball_distance1$passResult == "C"] <- 1
+ARIball_distance1$passResult[ARIball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+ARIball_distance1$passResult <- factor(ARIball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(ARIball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(ARIball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit8 <- glm(passResult ~ NearestDefender, data = ARIball_distance1, family = "binomial")
+
+summary(mylogit8)
+
+## Preparing the results for visualization
+newdat9 <- data.frame(NearestDefender=seq(min(ARIball_distance1$NearestDefender), 
+max(ARIball_distance1$NearestDefender)))
+
+newdat9$passResult = predict(mylogit8, newdata=newdat9, type = "response")
+
+ARIball_distance2 = table(cut(ARIball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 14, by = 1)))
+ARIball_distance3 <- as.data.frame(ARIball_distance2)
+
+newdat9$total = ARIball_distance3$Freq
+
+## Plotting the logistic regression
+p15 = plot_ly(newdat9, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Josh Rosen", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2560858 = add_trace(p15, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## ELI MANNING (NEW YORK GIANTS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr12 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2505996";
+
+NYGball_distance = dbGetQuery(con, sqlStr12);
+
+
+## Removing NAs from the data
+NYGball_distance1 = NYGball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+NYGball_distance1$passResult[NYGball_distance1$passResult == "IN"] <- "I"
+NYGball_distance1$passResult[NYGball_distance1$passResult == "C"] <- 1
+NYGball_distance1$passResult[NYGball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+NYGball_distance1$passResult <- factor(NYGball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(NYGball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(NYGball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit9 <- glm(passResult ~ NearestDefender, data = NYGball_distance1, family = "binomial")
+
+summary(mylogit9)
+
+## Preparing the results for visualization
+newdat10 <- data.frame(NearestDefender=seq(min(NYGball_distance1$NearestDefender), 
+max(NYGball_distance1$NearestDefender)))
+
+newdat10$passResult = predict(mylogit9, newdata=newdat10, type = "response")
+
+NYGball_distance2 = table(cut(NYGball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 17, by = 1)))
+NYGball_distance3 <- as.data.frame(NYGball_distance2)
+
+newdat10$total = NYGball_distance3$Freq
+
+## Plotting the logistic regression
+p16 = plot_ly(newdat10, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Eli Manning", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2505996 = add_trace(p16, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## DAK PRESCOTT (DALLAS COWBOYS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr13 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2555260";
+
+DALball_distance = dbGetQuery(con, sqlStr13);
+
+
+## Removing NAs from the data
+DALball_distance1 = DALball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+DALball_distance1$passResult[DALball_distance1$passResult == "IN"] <- "I"
+DALball_distance1$passResult[DALball_distance1$passResult == "C"] <- 1
+DALball_distance1$passResult[DALball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+DALball_distance1$passResult <- factor(DALball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(DALball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(DALball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit10 <- glm(passResult ~ NearestDefender, data = DALball_distance1, family = "binomial")
+
+summary(mylogit10)
+
+## Preparing the results for visualization
+newdat11 <- data.frame(NearestDefender=seq(min(DALball_distance1$NearestDefender), 
+max(DALball_distance1$NearestDefender)))
+
+newdat11$passResult = predict(mylogit10, newdata=newdat11, type = "response")
+
+DALball_distance2 = table(cut(DALball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 20, by = 1)))
+DALball_distance3 <- as.data.frame(DALball_distance2)
+
+newdat11$total = DALball_distance3$Freq
+
+## Plotting the logistic regression
+p17 = plot_ly(newdat11, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Dak Prescott", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2555260 = add_trace(p17, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## CARSON WENTZ (PHILADELPHIA EAGLES) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr14 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2555259";
+
+PHIball_distance = dbGetQuery(con, sqlStr14);
+
+
+## Removing NAs from the data
+PHIball_distance1 = PHIball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+PHIball_distance1$passResult[PHIball_distance1$passResult == "IN"] <- "I"
+PHIball_distance1$passResult[PHIball_distance1$passResult == "C"] <- 1
+PHIball_distance1$passResult[PHIball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+PHIball_distance1$passResult <- factor(PHIball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(PHIball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(PHIball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit11 <- glm(passResult ~ NearestDefender, data = PHIball_distance1, family = "binomial")
+
+summary(mylogit11)
+
+## Preparing the results for visualization
+newdat12 <- data.frame(NearestDefender=seq(min(PHIball_distance1$NearestDefender), 
+max(PHIball_distance1$NearestDefender)))
+
+newdat12$passResult = predict(mylogit11, newdata=newdat12, type = "response")
+
+PHIball_distance2 = table(cut(PHIball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 17, by = 1)))
+PHIball_distance3 <- as.data.frame(PHIball_distance2)
+
+newdat12$total = PHIball_distance3$Freq
+
+## Plotting the logistic regression
+p18 = plot_ly(newdat12, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Carson Wentz", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2555259 = add_trace(p18, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## ALEX SMITH (WASHINGTON REDSKINS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr15 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2506340";
+
+WASball_distance = dbGetQuery(con, sqlStr15);
+
+
+## Removing NAs from the data
+WASball_distance1 = WASball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+WASball_distance1$passResult[WASball_distance1$passResult == "IN"] <- "I"
+WASball_distance1$passResult[WASball_distance1$passResult == "C"] <- 1
+WASball_distance1$passResult[WASball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+WASball_distance1$passResult <- factor(WASball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(WASball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(WASball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit12 <- glm(passResult ~ NearestDefender, data = WASball_distance1, family = "binomial")
+
+summary(mylogit12)
+
+## Preparing the results for visualization
+newdat13 <- data.frame(NearestDefender=seq(min(WASball_distance1$NearestDefender), 
+max(WASball_distance1$NearestDefender)))
+
+newdat13$passResult = predict(mylogit12, newdata=newdat13, type = "response")
+
+WASball_distance2 = table(cut(WASball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 16, by = 1)))
+WASball_distance3 <- as.data.frame(WASball_distance2)
+
+newdat13$total = WASball_distance3$Freq
+
+## Plotting the logistic regression
+p19 = plot_ly(newdat13, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Alex Smith", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2506340 = add_trace(p19, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## JAMEIS WINSTON (TAMPA BAY BUCCANEERS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr16 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2552033";
+
+TBball_distance = dbGetQuery(con, sqlStr16);
+
+
+## Removing NAs from the data
+TBball_distance1 = TBball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+TBball_distance1$passResult[TBball_distance1$passResult == "IN"] <- "I"
+TBball_distance1$passResult[TBball_distance1$passResult == "C"] <- 1
+TBball_distance1$passResult[TBball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+TBball_distance1$passResult <- factor(TBball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(TBball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(TBball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit13 <- glm(passResult ~ NearestDefender, data = TBball_distance1, family = "binomial")
+
+summary(mylogit13)
+
+## Preparing the results for visualization
+newdat14 <- data.frame(NearestDefender=seq(min(TBball_distance1$NearestDefender), 
+max(TBball_distance1$NearestDefender)))
+
+newdat14$passResult = predict(mylogit13, newdata=newdat14, type = "response")
+
+TBball_distance2 = table(cut(TBball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 15, by = 1)))
+TBball_distance3 <- as.data.frame(TBball_distance2)
+
+newdat14$total = TBball_distance3$Freq
+
+## Plotting the logistic regression
+p20 = plot_ly(newdat14, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Jameis Winston", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender") 
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2552033 = add_trace(p20, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## MATT RYAN (ATLANTA FALCONS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr17 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 310";
+
+ATLball_distance = dbGetQuery(con, sqlStr17);
+
+
+## Removing NAs from the data
+ATLball_distance1 = ATLball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+ATLball_distance1$passResult[ATLball_distance1$passResult == "IN"] <- "I"
+ATLball_distance1$passResult[ATLball_distance1$passResult == "C"] <- 1
+ATLball_distance1$passResult[ATLball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+ATLball_distance1$passResult <- factor(ATLball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(ATLball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(ATLball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit14 <- glm(passResult ~ NearestDefender, data = ATLball_distance1, family = "binomial")
+
+summary(mylogit14)
+
+## Preparing the results for visualization
+newdat15 <- data.frame(NearestDefender=seq(min(ATLball_distance1$NearestDefender), 
+max(ATLball_distance1$NearestDefender)))
+
+newdat15$passResult = predict(mylogit14, newdata=newdat15, type = "response")
+
+ATLball_distance2 = table(cut(ATLball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 15, by = 1)))
+ATLball_distance3 <- as.data.frame(ATLball_distance2)
+
+newdat15$total = ATLball_distance3$Freq
+
+## Plotting the logistic regression
+p21 = plot_ly(newdat15, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Matt Ryan", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec310 = add_trace(p21, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## DREW BREES (NEW ORLEANS SAINTS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr18 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2504775";
+
+NOball_distance = dbGetQuery(con, sqlStr18);
+
+
+## Removing NAs from the data
+NOball_distance1 = NOball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+NOball_distance1$passResult[NOball_distance1$passResult == "IN"] <- "I"
+NOball_distance1$passResult[NOball_distance1$passResult == "C"] <- 1
+NOball_distance1$passResult[NOball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+NOball_distance1$passResult <- factor(NOball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(NOball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(NOball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit15 <- glm(passResult ~ NearestDefender, data = NOball_distance1, family = "binomial")
+
+summary(mylogit15)
+
+## Preparing the results for visualization
+newdat16 <- data.frame(NearestDefender=seq(min(NOball_distance1$NearestDefender), 
+max(NOball_distance1$NearestDefender)))
+
+newdat16$passResult = predict(mylogit15, newdata=newdat16, type = "response")
+
+NOball_distance2 = table(cut(NOball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 13, by = 1)))
+NOball_distance3 <- as.data.frame(NOball_distance2)
+
+newdat16$total = NOball_distance3$Freq
+
+## Plotting the logistic regression
+p22 = plot_ly(newdat16, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Drew Brees", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender") 
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2504775 = add_trace(p22, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## CAM NEWTON (CAROLINA PANTHERS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr19 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2495455";
+
+CARball_distance = dbGetQuery(con, sqlStr19);
+
+
+## Removing NAs from the data
+CARball_distance1 = CARball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+CARball_distance1$passResult[CARball_distance1$passResult == "IN"] <- "I"
+CARball_distance1$passResult[CARball_distance1$passResult == "C"] <- 1
+CARball_distance1$passResult[CARball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+CARball_distance1$passResult <- factor(CARball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(CARball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(CARball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit16 <- glm(passResult ~ NearestDefender, data = CARball_distance1, family = "binomial")
+
+summary(mylogit16)
+
+## Preparing the results for visualization
+newdat17 <- data.frame(NearestDefender=seq(min(CARball_distance1$NearestDefender), 
+max(CARball_distance1$NearestDefender)))
+
+newdat17$passResult = predict(mylogit16, newdata=newdat17, type = "response")
+
+CARball_distance2 = table(cut(CARball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 16, by = 1)))
+CARball_distance3 <- as.data.frame(CARball_distance2)
+
+newdat17$total = CARball_distance3$Freq
+
+## Plotting the logistic regression
+p23 = plot_ly(newdat17, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Cam Newton", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2495455 = add_trace(p23, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## PATRICK MAHOMES (KANSAS CITY CHIEFS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr20 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2558125";
+
+KCball_distance = dbGetQuery(con, sqlStr20);
+
+
+## Removing NAs from the data
+KCball_distance1 = KCball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+KCball_distance1$passResult[KCball_distance1$passResult == "IN"] <- "I"
+KCball_distance1$passResult[KCball_distance1$passResult == "C"] <- 1
+KCball_distance1$passResult[KCball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+KCball_distance1$passResult <- factor(KCball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(KCball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(KCball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit17 <- glm(passResult ~ NearestDefender, data = KCball_distance1, family = "binomial")
+
+summary(mylogit17)
+
+## Preparing the results for visualization
+newdat18 <- data.frame(NearestDefender=seq(min(KCball_distance1$NearestDefender), 
+max(KCball_distance1$NearestDefender)))
+
+newdat18$passResult = predict(mylogit17, newdata=newdat18, type = "response")
+
+KCball_distance2 = table(cut(KCball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 14, by = 1)))
+KCball_distance3 <- as.data.frame(KCball_distance2)
+KCball_distance3$Freq[8] <- 40
+
+newdat18$total = KCball_distance3$Freq
+
+## Plotting the logistic regression
+p24 = plot_ly(newdat18, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Patrick Mahomes", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2558125 = add_trace(p24, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## DEREK CARR (OAKLAND RAIDERS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr21 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2543499";
+
+OAKball_distance = dbGetQuery(con, sqlStr21);
+
+
+## Removing NAs from the data
+OAKball_distance1 = OAKball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+OAKball_distance1$passResult[OAKball_distance1$passResult == "IN"] <- "I"
+OAKball_distance1$passResult[OAKball_distance1$passResult == "C"] <- 1
+OAKball_distance1$passResult[OAKball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+OAKball_distance1$passResult <- factor(OAKball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(OAKball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(OAKball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit18 <- glm(passResult ~ NearestDefender, data = OAKball_distance1, family = "binomial")
+
+summary(mylogit18)
+
+## Preparing the results for visualization
+newdat19 <- data.frame(NearestDefender=seq(min(OAKball_distance1$NearestDefender), 
+max(OAKball_distance1$NearestDefender)))
+
+newdat19$passResult = predict(mylogit18, newdata=newdat19, type = "response")
+
+OAKball_distance2 = table(cut(OAKball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 15, by = 1)))
+OAKball_distance3 <- as.data.frame(OAKball_distance2)
+
+newdat19$total = OAKball_distance3$Freq
+
+## Plotting the logistic regression
+p25 = plot_ly(newdat19, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Derek Carr", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2543499 = add_trace(p25, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## CASE KEENUM (DENVER BRONCOS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr22 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2532888";
+
+DENball_distance = dbGetQuery(con, sqlStr22);
+
+
+## Removing NAs from the data
+DENball_distance1 = DENball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+DENball_distance1$passResult[DENball_distance1$passResult == "IN"] <- "I"
+DENball_distance1$passResult[DENball_distance1$passResult == "C"] <- 1
+DENball_distance1$passResult[DENball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+DENball_distance1$passResult <- factor(DENball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(DENball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(DENball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit19 <- glm(passResult ~ NearestDefender, data = DENball_distance1, family = "binomial")
+
+summary(mylogit19)
+
+## Preparing the results for visualization
+newdat20 <- data.frame(NearestDefender=seq(min(DENball_distance1$NearestDefender), 
+max(DENball_distance1$NearestDefender)))
+
+newdat20$passResult = predict(mylogit19, newdata=newdat20, type = "response")
+
+DENball_distance2 = table(cut(DENball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 14, by = 1)))
+DENball_distance3 <- as.data.frame(DENball_distance2)
+
+newdat20$total = DENball_distance3$Freq
+
+## Plotting the logistic regression
+p26 = plot_ly(newdat20, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Case Keenum", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2532888 = add_trace(p26, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## PHILIP RIVERS (LOS ANGELES CHARGERS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr23 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2506121";
+
+LACball_distance = dbGetQuery(con, sqlStr23);
+
+
+## Removing NAs from the data
+LACball_distance1 = LACball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+LACball_distance1$passResult[LACball_distance1$passResult == "IN"] <- "I"
+LACball_distance1$passResult[LACball_distance1$passResult == "C"] <- 1
+LACball_distance1$passResult[LACball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+LACball_distance1$passResult <- factor(LACball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(LACball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(LACball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit20 <- glm(passResult ~ NearestDefender, data = LACball_distance1, family = "binomial")
+
+summary(mylogit20)
+
+## Preparing the results for visualization
+newdat21 <- data.frame(NearestDefender=seq(min(LACball_distance1$NearestDefender), 
+max(LACball_distance1$NearestDefender)))
+
+newdat21$passResult = predict(mylogit20, newdata=newdat21, type = "response")
+
+LACball_distance2 = table(cut(LACball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 14, by = 1)))
+LACball_distance3 <- as.data.frame(LACball_distance2)
+
+newdat21$total = LACball_distance3$Freq
+
+## Plotting the logistic regression
+p27 = plot_ly(newdat21, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Philip Rivers", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2506121 = add_trace(p27, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## TOM BRADY (NEW ENGLAND PATRIOTS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr24 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2504211";
+
+NEball_distance = dbGetQuery(con, sqlStr24);
+
+
+## Removing NAs from the data
+NEball_distance1 = NEball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+NEball_distance1$passResult[NEball_distance1$passResult == "IN"] <- "I"
+NEball_distance1$passResult[NEball_distance1$passResult == "C"] <- 1
+NEball_distance1$passResult[NEball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+NEball_distance1$passResult <- factor(NEball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(NEball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(NEball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit21 <- glm(passResult ~ NearestDefender, data = NEball_distance1, family = "binomial")
+
+summary(mylogit21)
+
+## Preparing the results for visualization
+newdat22 <- data.frame(NearestDefender=seq(min(NEball_distance1$NearestDefender), 
+max(NEball_distance1$NearestDefender)))
+
+newdat22$passResult = predict(mylogit21, newdata=newdat22, type = "response")
+
+NEball_distance2 = table(cut(NEball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 23, by = 1)))
+NEball_distance3 <- as.data.frame(NEball_distance2)
+
+newdat22$total = NEball_distance3$Freq
+
+## Plotting the logistic regression
+p28 = plot_ly(newdat22, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Tom Brady", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2504211 = add_trace(p28, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## RYAN TANNEHILL (MIAMI DOLPHINS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr25 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2532956";
+
+MIAball_distance = dbGetQuery(con, sqlStr25);
+
+
+## Removing NAs from the data
+MIAball_distance1 = MIAball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+MIAball_distance1$passResult[MIAball_distance1$passResult == "IN"] <- "I"
+MIAball_distance1$passResult[MIAball_distance1$passResult == "C"] <- 1
+MIAball_distance1$passResult[MIAball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+MIAball_distance1$passResult <- factor(MIAball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(MIAball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(MIAball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit22 <- glm(passResult ~ NearestDefender, data = MIAball_distance1, family = "binomial")
+
+summary(mylogit22)
+
+## Preparing the results for visualization
+newdat23 <- data.frame(NearestDefender=seq(min(MIAball_distance1$NearestDefender), 
+max(MIAball_distance1$NearestDefender)))
+
+newdat23$passResult = predict(mylogit22, newdata=newdat23, type = "response")
+
+MIAball_distance2 = table(cut(MIAball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 12, by = 1)))
+MIAball_distance3 <- as.data.frame(MIAball_distance2)
+
+newdat23$total = MIAball_distance3$Freq
+
+## Plotting the logistic regression
+p29 = plot_ly(newdat23, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Ryan Tannehill", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2532956 = add_trace(p29, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## JOSH ALLEN (BUFFALO BILLS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr26 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2560955";
+
+BUFball_distance = dbGetQuery(con, sqlStr26);
+
+
+## Removing NAs from the data
+BUFball_distance1 = BUFball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+BUFball_distance1$passResult[BUFball_distance1$passResult == "IN"] <- "I"
+BUFball_distance1$passResult[BUFball_distance1$passResult == "C"] <- 1
+BUFball_distance1$passResult[BUFball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+BUFball_distance1$passResult <- factor(BUFball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(BUFball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(BUFball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit23 <- glm(passResult ~ NearestDefender, data = BUFball_distance1, family = "binomial")
+
+summary(mylogit23)
+
+## Preparing the results for visualization
+newdat24 <- data.frame(NearestDefender=seq(min(BUFball_distance1$NearestDefender), 
+max(BUFball_distance1$NearestDefender)))
+
+newdat24$passResult = predict(mylogit23, newdata=newdat24, type = "response")
+
+BUFball_distance2 = table(cut(BUFball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 12, by = 1)))
+BUFball_distance3 <- as.data.frame(BUFball_distance2)
+
+newdat24$total = BUFball_distance3$Freq
+
+## Plotting the logistic regression
+p30 = plot_ly(newdat24, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Josh Allen", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2560955 = add_trace(p30, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## SAM DARNOLD (NEW YORK JETS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr27 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2561036";
+
+NYJball_distance = dbGetQuery(con, sqlStr27);
+
+
+## Removing NAs from the data
+NYJball_distance1 = NYJball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+NYJball_distance1$passResult[NYJball_distance1$passResult == "IN"] <- "I"
+NYJball_distance1$passResult[NYJball_distance1$passResult == "C"] <- 1
+NYJball_distance1$passResult[NYJball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+NYJball_distance1$passResult <- factor(NYJball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(NYJball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(NYJball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit24 <- glm(passResult ~ NearestDefender, data = NYJball_distance1, family = "binomial")
+
+summary(mylogit24)
+
+## Preparing the results for visualization
+newdat25 <- data.frame(NearestDefender=seq(min(NYJball_distance1$NearestDefender), 
+max(NYJball_distance1$NearestDefender)))
+
+newdat25$passResult = predict(mylogit24, newdata=newdat25, type = "response")
+
+NYJball_distance2 = table(cut(NYJball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 12, by = 1)))
+NYJball_distance3 <- as.data.frame(NYJball_distance2)
+
+newdat25$total = NYJball_distance3$Freq
+
+## Plotting the logistic regression
+p31 = plot_ly(newdat25, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Sam Darnold", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender") 
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2561036 = add_trace(p31, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## BEN ROETHLISBERGER (PITTSBURGH STEELERS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr28 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2506109";
+
+PITball_distance = dbGetQuery(con, sqlStr28);
+
+
+## Removing NAs from the data
+PITball_distance1 = PITball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+PITball_distance1$passResult[PITball_distance1$passResult == "IN"] <- "I"
+PITball_distance1$passResult[PITball_distance1$passResult == "C"] <- 1
+PITball_distance1$passResult[PITball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+PITball_distance1$passResult <- factor(PITball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(PITball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(PITball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit25 <- glm(passResult ~ NearestDefender, data = PITball_distance1, family = "binomial")
+
+summary(mylogit25)
+
+## Preparing the results for visualization
+newdat26 <- data.frame(NearestDefender=seq(min(PITball_distance1$NearestDefender), 
+max(PITball_distance1$NearestDefender)))
+
+newdat26$passResult = predict(mylogit25, newdata=newdat26, type = "response")
+
+PITball_distance2 = table(cut(PITball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 14, by = 1)))
+PITball_distance3 <- as.data.frame(PITball_distance2)
+PITball_distance3$Freq[2] <- 120
+
+newdat26$total = PITball_distance3$Freq
+
+## Plotting the logistic regression
+p32 = plot_ly(newdat26, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Ben Roethlisberger", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2506109 = add_trace(p32, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## JOE FLACCO (BALTIMORE RAVENS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr29 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 382";
+
+BALball_distance = dbGetQuery(con, sqlStr29);
+
+
+## Removing NAs from the data
+BALball_distance1 = BALball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+BALball_distance1$passResult[BALball_distance1$passResult == "IN"] <- "I"
+BALball_distance1$passResult[BALball_distance1$passResult == "C"] <- 1
+BALball_distance1$passResult[BALball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+BALball_distance1$passResult <- factor(BALball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(BALball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(BALball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit26 <- glm(passResult ~ NearestDefender, data = BALball_distance1, family = "binomial")
+
+summary(mylogit26)
+
+## Preparing the results for visualization
+newdat27 <- data.frame(NearestDefender=seq(min(BALball_distance1$NearestDefender), 
+max(BALball_distance1$NearestDefender)))
+
+newdat27$passResult = predict(mylogit26, newdata=newdat27, type = "response")
+
+BALball_distance2 = table(cut(BALball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 16, by = 1)))
+BALball_distance3 <- as.data.frame(BALball_distance2)
+
+newdat27$total = BALball_distance3$Freq
+
+## Plotting the logistic regression
+p33 = plot_ly(newdat27, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Joe Flacco", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec382 = add_trace(p33, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## ANDY DALTON (CINCINNATI BENGALS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr30 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2495143";
+
+CINball_distance = dbGetQuery(con, sqlStr30);
+
+
+## Removing NAs from the data
+CINball_distance1 = CINball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+CINball_distance1$passResult[CINball_distance1$passResult == "IN"] <- "I"
+CINball_distance1$passResult[CINball_distance1$passResult == "C"] <- 1
+CINball_distance1$passResult[CINball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+CINball_distance1$passResult <- factor(CINball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(CINball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(CINball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit27 <- glm(passResult ~ NearestDefender, data = CINball_distance1, family = "binomial")
+
+summary(mylogit27)
+
+## Preparing the results for visualization
+newdat28 <- data.frame(NearestDefender=seq(min(CINball_distance1$NearestDefender), 
+max(CINball_distance1$NearestDefender)))
+
+newdat28$passResult = predict(mylogit27, newdata=newdat28, type = "response")
+
+CINball_distance2 = table(cut(CINball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 14, by = 1)))
+CINball_distance3 <- as.data.frame(CINball_distance2)
+
+newdat28$total = CINball_distance3$Freq
+
+## Plotting the logistic regression
+p34 = plot_ly(newdat28, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Andy Dalton", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2495143 = add_trace(p34, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## BAKER MAYFIELD (CLEVELAND BROWNS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr31 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2560800";
+
+CLEball_distance = dbGetQuery(con, sqlStr31);
+
+
+## Removing NAs from the data
+CLEball_distance1 = CLEball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+CLEball_distance1$passResult[CLEball_distance1$passResult == "IN"] <- "I"
+CLEball_distance1$passResult[CLEball_distance1$passResult == "C"] <- 1
+CLEball_distance1$passResult[CLEball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+CLEball_distance1$passResult <- factor(CLEball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(CLEball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(CLEball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit28 <- glm(passResult ~ NearestDefender, data = CLEball_distance1, family = "binomial")
+
+summary(mylogit28)
+
+## Preparing the results for visualization
+newdat29 <- data.frame(NearestDefender=seq(min(CLEball_distance1$NearestDefender), 
+max(CLEball_distance1$NearestDefender)))
+
+newdat29$passResult = predict(mylogit28, newdata=newdat29, type = "response")
+
+CLEball_distance2 = table(cut(CLEball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 15, by = 1)))
+CLEball_distance3 <- as.data.frame(CLEball_distance2)
+
+newdat29$total = CLEball_distance3$Freq
+
+## Plotting the logistic regression
+p35 = plot_ly(newdat29, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Baker Mayfield", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2560800 = add_trace(p35, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## DESHAUN WATSON (HOUSTON TEXANS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr32 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2558063";
+
+HOUball_distance = dbGetQuery(con, sqlStr32);
+
+
+## Removing NAs from the data
+HOUball_distance1 = HOUball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+HOUball_distance1$passResult[HOUball_distance1$passResult == "IN"] <- "I"
+HOUball_distance1$passResult[HOUball_distance1$passResult == "C"] <- 1
+HOUball_distance1$passResult[HOUball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+HOUball_distance1$passResult <- factor(HOUball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(HOUball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(HOUball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit29 <- glm(passResult ~ NearestDefender, data = HOUball_distance1, family = "binomial")
+
+summary(mylogit29)
+
+## Preparing the results for visualization
+newdat30 <- data.frame(NearestDefender=seq(min(HOUball_distance1$NearestDefender), 
+max(HOUball_distance1$NearestDefender)))
+
+newdat30$passResult = predict(mylogit29, newdata=newdat30, type = "response")
+
+HOUball_distance2 = table(cut(HOUball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 20, by = 1)))
+HOUball_distance3 <- as.data.frame(HOUball_distance2)
+
+newdat30$total = HOUball_distance3$Freq
+
+## Plotting the logistic regression
+p36 = plot_ly(newdat30, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Deshaun Watson", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender") 
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2558063 = add_trace(p36, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## ANDREW LUCK (INDIANAPOLIS COLTS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr33 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2533031";
+
+INDball_distance = dbGetQuery(con, sqlStr33);
+
+
+## Removing NAs from the data
+INDball_distance1 = INDball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+INDball_distance1$passResult[INDball_distance1$passResult == "IN"] <- "I"
+INDball_distance1$passResult[INDball_distance1$passResult == "C"] <- 1
+INDball_distance1$passResult[INDball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+INDball_distance1$passResult <- factor(INDball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(INDball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(INDball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit30 <- glm(passResult ~ NearestDefender, data = INDball_distance1, family = "binomial")
+
+summary(mylogit30)
+
+## Preparing the results for visualization
+newdat31 <- data.frame(NearestDefender=seq(min(INDball_distance1$NearestDefender), 
+max(INDball_distance1$NearestDefender)))
+
+newdat31$passResult = predict(mylogit30, newdata=newdat31, type = "response")
+
+INDball_distance2 = table(cut(INDball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 17, by = 1)))
+INDball_distance3 <- as.data.frame(INDball_distance2)
+
+newdat31$total = INDball_distance3$Freq
+
+## Plotting the logistic regression
+p37 = plot_ly(newdat31, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Andrew Luck", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2533031 = add_trace(p37, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## BLAKE BORTLES (JACKSONVILLE JAGUARS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr34 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2543477";
+
+JAXball_distance = dbGetQuery(con, sqlStr34);
+
+
+## Removing NAs from the data
+JAXball_distance1 = JAXball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+JAXball_distance1$passResult[JAXball_distance1$passResult == "IN"] <- "I"
+JAXball_distance1$passResult[JAXball_distance1$passResult == "C"] <- 1
+JAXball_distance1$passResult[JAXball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+JAXball_distance1$passResult <- factor(JAXball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(JAXball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(JAXball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit31 <- glm(passResult ~ NearestDefender, data = JAXball_distance1, family = "binomial")
+
+summary(mylogit31)
+
+## Preparing the results for visualization
+newdat32 <- data.frame(NearestDefender=seq(min(JAXball_distance1$NearestDefender), 
+max(JAXball_distance1$NearestDefender)))
+
+newdat32$passResult = predict(mylogit31, newdata=newdat32, type = "response")
+
+JAXball_distance2 = table(cut(JAXball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 13, by = 1)))
+JAXball_distance3 <- as.data.frame(JAXball_distance2)
+
+newdat32$total = JAXball_distance3$Freq
+
+## Plotting the logistic regression
+p38 = plot_ly(newdat32, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Blake Bortles", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2543477 = add_trace(p38, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+################## MARCUS MARIOTA (TENNESSEE TITANS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr35 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2552466";
+
+TENball_distance = dbGetQuery(con, sqlStr35);
+
+
+## Removing NAs from the data
+TENball_distance1 = TENball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+TENball_distance1$passResult[TENball_distance1$passResult == "IN"] <- "I"
+TENball_distance1$passResult[TENball_distance1$passResult == "C"] <- 1
+TENball_distance1$passResult[TENball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+TENball_distance1$passResult <- factor(TENball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(TENball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(TENball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit32 <- glm(passResult ~ NearestDefender, data = TENball_distance1, family = "binomial")
+
+summary(mylogit32)
+
+## Preparing the results for visualization
+newdat33 <- data.frame(NearestDefender=seq(min(TENball_distance1$NearestDefender), 
+max(TENball_distance1$NearestDefender)))
+
+newdat33$passResult = predict(mylogit32, newdata=newdat33, type = "response")
+
+TENball_distance2 = table(cut(TENball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 15, by = 1)))
+TENball_distance3 <- as.data.frame(TENball_distance2)
+
+newdat33$total = TENball_distance3$Freq
+
+## Plotting the logistic regression
+p39 = plot_ly(newdat33, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Marcus Mariota", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2552466 = add_trace(p39, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+########### BACKUP QBs THAT HAD AT LEAST 160 PASS ATTEMPTS(10 per game) ##################
+
+############# RYAN FITZPATRICK (TAMPA BAY BUCCANEERS) ########################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr100 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2506581";
+
+TB1ball_distance = dbGetQuery(con, sqlStr100);
+
+
+## Removing NAs from the data
+TB1ball_distance1 = TB1ball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+TB1ball_distance1$passResult[TB1ball_distance1$passResult == "IN"] <- "I"
+TB1ball_distance1$passResult[TB1ball_distance1$passResult == "C"] <- 1
+TB1ball_distance1$passResult[TB1ball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+TB1ball_distance1$passResult <- factor(TB1ball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(TB1ball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(TB1ball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit101 <- glm(passResult ~ NearestDefender, data = TB1ball_distance1, family = "binomial")
+
+summary(mylogit101)
+
+## Preparing the results for visualization
+newdat101 <- data.frame(NearestDefender=seq(min(TB1ball_distance1$NearestDefender), 
+max(TB1ball_distance1$NearestDefender)))
+
+newdat101$passResult = predict(mylogit101, newdata=newdat101, type = "response")
+
+TB1ball_distance2 = table(cut(TB1ball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 18, by = 1)))
+TB1ball_distance3 <- as.data.frame(TB1ball_distance2)
+
+newdat101$total = TB1ball_distance3$Freq
+
+## Plotting the logistic regression
+p101 = plot_ly(newdat101, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Ryan Fitzpatrick", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2506581 = add_trace(p101, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+##################### NICK FOLES (PHILADELPHIA EAGLES) #####################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr101 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2532842";
+
+PH1ball_distance = dbGetQuery(con, sqlStr101);
+
+
+## Removing NAs from the data
+PH1ball_distance1 = PH1ball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+PH1ball_distance1$passResult[PH1ball_distance1$passResult == "IN"] <- "I"
+PH1ball_distance1$passResult[PH1ball_distance1$passResult == "C"] <- 1
+PH1ball_distance1$passResult[PH1ball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+PH1ball_distance1$passResult <- factor(PH1ball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(PH1ball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(PH1ball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit102 <- glm(passResult ~ NearestDefender, data = PH1ball_distance1, family = "binomial")
+
+summary(mylogit102)
+
+## Preparing the results for visualization
+newdat102 <- data.frame(NearestDefender=seq(min(PH1ball_distance1$NearestDefender), 
+max(PH1ball_distance1$NearestDefender)))
+
+newdat102$passResult = predict(mylogit102, newdata=newdat102, type = "response")
+
+PH1ball_distance2 = table(cut(PH1ball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 16, by = 1)))
+PH1ball_distance3 <- as.data.frame(PH1ball_distance2)
+
+newdat102$total = PH1ball_distance3$Freq
+
+## Plotting the logistic regression
+p102 = plot_ly(newdat102, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Nick Foles", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2532842 = add_trace(p102, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+##################### LAMAR JACKSON (BALTIMORE RAVENS) #####################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr102 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2560757";
+
+BA1ball_distance = dbGetQuery(con, sqlStr102);
+
+
+## Removing NAs from the data
+BA1ball_distance1 = BA1ball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+BA1ball_distance1$passResult[BA1ball_distance1$passResult == "IN"] <- "I"
+BA1ball_distance1$passResult[BA1ball_distance1$passResult == "C"] <- 1
+BA1ball_distance1$passResult[BA1ball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+BA1ball_distance1$passResult <- factor(BA1ball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(BA1ball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(BA1ball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit103 <- glm(passResult ~ NearestDefender, data = BA1ball_distance1, family = "binomial")
+
+summary(mylogit103)
+
+## Preparing the results for visualization
+newdat103 <- data.frame(NearestDefender=seq(min(BA1ball_distance1$NearestDefender), 
+max(BA1ball_distance1$NearestDefender)))
+
+newdat103$passResult = predict(mylogit103, newdata=newdat103, type = "response")
+
+BA1ball_distance2 = table(cut(BA1ball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 15, by = 1)))
+BA1ball_distance3 <- as.data.frame(BA1ball_distance2)
+
+newdat103$total = BA1ball_distance3$Freq
+
+## Plotting the logistic regression
+p103 = plot_ly(newdat103, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Lamar Jackson", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2560757 = add_trace(p103, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+##################### BROCK OSWEILER (MIAMI DOLPHINS) #####################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr103 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2533436";
+
+MA1ball_distance = dbGetQuery(con, sqlStr103);
+
+
+## Removing NAs from the data
+MA1ball_distance1 = MA1ball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+MA1ball_distance1$passResult[MA1ball_distance1$passResult == "IN"] <- "I"
+MA1ball_distance1$passResult[MA1ball_distance1$passResult == "C"] <- 1
+MA1ball_distance1$passResult[MA1ball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+MA1ball_distance1$passResult <- factor(MA1ball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(MA1ball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(MA1ball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit104 <- glm(passResult ~ NearestDefender, data = MA1ball_distance1, family = "binomial")
+
+summary(mylogit104)
+
+## Preparing the results for visualization
+newdat104 <- data.frame(NearestDefender=seq(min(MA1ball_distance1$NearestDefender), 
+max(MA1ball_distance1$NearestDefender)))
+
+newdat104$passResult = predict(mylogit104, newdata=newdat104, type = "response")
+
+MA1ball_distance2 = table(cut(MA1ball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 11, by = 1)))
+MA1ball_distance3 <- as.data.frame(MA1ball_distance2)
+
+newdat104$total = MA1ball_distance3$Freq
+
+## Plotting the logistic regression
+p104 = plot_ly(newdat104, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Brock Osweiler", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2533436 = add_trace(p104, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+##################### JEFF DRISKEL (CINCINNATI BENGALS) #####################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr104 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2555262";
+
+CI1ball_distance = dbGetQuery(con, sqlStr104);
+
+
+## Removing NAs from the data
+CI1ball_distance1 = CI1ball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+CI1ball_distance1$passResult[CI1ball_distance1$passResult == "IN"] <- "I"
+CI1ball_distance1$passResult[CI1ball_distance1$passResult == "C"] <- 1
+CI1ball_distance1$passResult[CI1ball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+CI1ball_distance1$passResult <- factor(CI1ball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(CI1ball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(CI1ball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit105 <- glm(passResult ~ NearestDefender, data = CI1ball_distance1, family = "binomial")
+
+summary(mylogit105)
+
+## Preparing the results for visualization
+newdat105 <- data.frame(NearestDefender=seq(min(CI1ball_distance1$NearestDefender), 
+max(CI1ball_distance1$NearestDefender)))
+
+newdat105$passResult = predict(mylogit105, newdata=newdat105, type = "response")
+
+CI1ball_distance2 = table(cut(CI1ball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 11, by = 1)))
+CI1ball_distance3 <- as.data.frame(CI1ball_distance2)
+
+newdat105$total = CI1ball_distance3$Freq
+
+## Plotting the logistic regression
+p105 = plot_ly(newdat105, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "Jeff Driskel", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2555262 = add_trace(p105, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+##################### C.J. BEATHARD (SAN FRANCISCO 49ERS) #####################
+library(remotes)
+library(bigrquery)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(DBI)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(plotly)
+
+## Establishing connection between RStudio and BigQuery
+## remotes::install_github("r-dbi/DBI")
+
+## remotes::install_github("r-dbi/bigrquery") 
+
+## con = dbConnect(bigrquery::bigquery(), project = "wsu-nfl-team1", dataset = "kaggle_raw")
+
+## dbListTables(con)
+
+## SQL Query
+sqlStr106 = "SELECT passResult, NearestDefender FROM `wsu-nfl-team1.kaggle_raw.ClosestDefender7` WHERE QBId = 2557922";
+
+SF1ball_distance = dbGetQuery(con, sqlStr106);
+
+
+## Removing NAs from the data
+SF1ball_distance1 = SF1ball_distance %>% drop_na()
+
+## Changing all of the "IN"(interception) in the data to "I"(incomplete)
+## Interceptions count as incompletions and we need binary data, therefore
+## we can only deal with completions and incompletions
+SF1ball_distance1$passResult[SF1ball_distance1$passResult == "IN"] <- "I"
+SF1ball_distance1$passResult[SF1ball_distance1$passResult == "C"] <- 1
+SF1ball_distance1$passResult[SF1ball_distance1$passResult == "I"] <- 0
+
+## Setting target variable(passResult) as a factor for logistic regression
+SF1ball_distance1$passResult <- factor(SF1ball_distance1$passResult)
+
+## Confirming that the target variable is indeed a factor
+is.factor(SF1ball_distance1$passResult)
+
+## Checking how many unique values are in passResult, making sure that
+## there are only 2(completion and incompletion)
+sapply(SF1ball_distance1, function(passResult) length(unique(passResult)))
+
+## Running logistic regression on the data
+mylogit106 <- glm(passResult ~ NearestDefender, data = SF1ball_distance1, family = "binomial")
+
+summary(mylogit106)
+
+## Preparing the results for visualization
+newdat106 <- data.frame(NearestDefender=seq(min(SF1ball_distance1$NearestDefender), 
+max(SF1ball_distance1$NearestDefender)))
+
+newdat106$passResult = predict(mylogit106, newdata=newdat106, type = "response")
+
+SF1ball_distance2 = table(cut(SF1ball_distance1$NearestDefender, breaks = seq.int(from = 0, to = 12, by = 1)))
+SF1ball_distance3 <- as.data.frame(SF1ball_distance2)
+
+newdat106$total = SF1ball_distance3$Freq
+
+## Plotting the logistic regression
+p106 = plot_ly(newdat106, x = ~NearestDefender, y = ~passResult, type = "scatter", name = "C.J. Beathard", mode = "markers",
+             line=list(color='light blue'), marker = list(size = ~total, sizeref = 2)) %>%
+layout(xaxis=list(title="Distance from Receiver to Nearest Defender (yards)"),
+yaxis=list(title="Probability of Complete Pass"), title="Completion Probability by Distance to Nearest Defender")
+
+## Adding an extra line to the graph that represents the league average
+OpenRec2557922 = add_trace(p106, data = newdat2, x= ~NearestDefender, y= ~passResult, mode='markers', name = "League Average", line=list(color='orange'), marker = list(size = ~total, sizeref = 60))
+
+```
+
+```{r}
+openRecRank.df <- data.frame (QB_ID  = c(2506109, 2543499, 2533436, 2532888, 2552466, 2504211, 2495455, 2505996, 2543477, 2558979, 2504775, 2532975, 
+                             2558125, 2557922, 2533031, 2506340, 2555260, 2532956, 2552033, 2560858, 2558063, 79860, 2560800, 2532820, 382, 
+                             2555262, 2506363, 310, 2532842, 2560757, 2506121, 2558008, 2561036, 2495143, 2560955, 2506581, 2555259, 2555334),
+                  Quarterback = c("Ben Roethlisberger(PIT)", "Derek Carr(OAK)", "Brock Osweiler(MIA)", "Case Keenum(DEN)", 
+                                  "Marcus Mariota(TEN)", "Tom Brady(NE)", "Cam Newton(CAR)", "Eli Manning(NYG)", "Blake Bortles(JAX)", 
+                                  "Nick Mullens(SF)", "Drew Brees(NO)", "Russell Wilson(SEA)", "Patrick Mahomes(KC)", "C.J. Beathard(SF)",   
+                                  "Andrew Luck(IND)", "Alex Smith(WAS)", "Dak Prescott(DAL)", "Ryan Tannehill(MIA)", "Jameis Winston(TB)", 
+                                  "Josh Rosen(ARI)", "Deshaun Watson(HOU)", "Matthew Stafford(DET)", "Baker Mayfield(CLE)", 
+                                  "Kirk Cousins(MIN)", "Joe Flacco(BAL)", "Jeff Driskel(CIN)", "Aaron Rodgers(GB)", "Matt Ryan(ATL)", 
+                                  "Nick Foles(PHI)", "Lamar Jackson(BAL)", "Philip Rivers(LAC)", "Mitch Trubisky(CHI)", "Sam Darnold(NYJ)", 
+                                  "Andy Dalton(CIN)", "Josh Allen(BUF)", "Ryan Fitzpatrick(TB)", "Carson Wentz(PHI)", "Jared Goff(LAR)"),
+                  Percentage = c("38.56%", "38.10%", "36.65%", "35.29%", "35.14%", "34.71%", "34.61%", "34.04%", "34.01%", "33.85%",
+                                 "32.98%", "32.77%", "32.72%", "32.50%", "31.88%", "31.85%", "31.61%", "31.42%", "31.37%", "31.15%",
+                                 "30.72%", "30.47%", "30.06%", "30.02%", "29.86%", "29.82%", "29.51%", "29.28%", "28.42%", "27.98%",
+                                 "27.84%", "27.65%", "27.37%", "26.89%", "26.58%", "25.51%", "25.13%", "24.91%")
+                  )
+
+colnames(openRecRank.df) <- c('QB ID','Name','PTO')
+
+#View(openRecRank.df)
+```
